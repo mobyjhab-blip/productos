@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador de Presupuestos Firebase</title>
+    <title>Generador de Presupuestos Firebase con Auth</title>
     <style>
         :root {
             --primary-color: #2563eb;
@@ -26,8 +26,70 @@
             color: var(--text-color);
             padding: 20px;
             position: relative;
+            min-height: 100vh;
         }
 
+        /* Vistas principales */
+        #auth-screen {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 90vh;
+        }
+
+        #app-screen {
+            display: none; /* Se muestra solo al autenticar */
+        }
+
+        /* Tarjeta de Login */
+        .login-card {
+            background: var(--card-bg);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+
+        .login-card h2 {
+            margin-bottom: 10px;
+            color: #1e293b;
+        }
+
+        .login-card p {
+            color: #64748b;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .btn-google {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            background: white;
+            border: 1px solid #cbd5e1;
+            padding: 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            transition: background 0.2s;
+            color: #334155;
+        }
+
+        .btn-google:hover {
+            background: #f8fafc;
+        }
+
+        .btn-google img {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Estructura del Aplicativo Principal */
         .container {
             max-width: 1100px;
             margin: 0 auto;
@@ -63,21 +125,42 @@
             line-height: 1.4;
         }
 
-        /* Botón de Configuración Superior Derecha */
-        .config-trigger {
+        /* Controles de usuario superior derecho */
+        .user-controls {
             position: absolute;
             top: 20px;
             right: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            z-index: 10;
+        }
+
+        .config-trigger {
             background: none;
             border: none;
             font-size: 24px;
             cursor: pointer;
             color: #64748b;
             transition: color 0.2s;
-            z-index: 10;
         }
 
         .config-trigger:hover { color: var(--primary-color); }
+
+        .btn-logout {
+            background: #f1f5f9;
+            color: #64748b;
+            font-size: 13px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1;
+            cursor: pointer;
+        }
+
+        .btn-logout:hover {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
 
         /* Sistema de Pestañas */
         .tabs {
@@ -252,7 +335,7 @@
         /* Estilos de Impresión */
         @media print {
             body { background: white; color: black; padding: 0; }
-            .tabs, .config-trigger, #client-form, #inventory-form, .grid-form, h2, th:last-child, td:last-child, .btn-danger, .modal {
+            .tabs, .user-controls, #client-form, #inventory-form, .grid-form, h2, th:last-child, td:last-child, .btn-danger, .modal {
                 display: none !important;
             }
             .tab-content { display: none !important; }
@@ -277,146 +360,164 @@
 </head>
 <body>
 
-<!-- Icono Configuración -->
-<button class="config-trigger" onclick="toggleModal(true)" title="Configuración de la Empresa">⚙️</button>
+<!-- PANTALLA DE AUTENTICACIÓN (LOGIN) -->
+<div id="auth-screen">
+    <div class="login-card">
+        <h2>Bienvenido</h2>
+        <p>Inicia sesión con tu cuenta corporativa para gestionar presupuestos e inventarios.</p>
+        <button id="btn-google-login" class="btn-google">
+            <img src="https://lh3.googleusercontent.com/COxitS7CH7Of490YnOf2QQfCDYAtM7hhg98v675bC56YQI9clg8ax1ih6p9eZp5OhChf" alt="Google Logo">
+            Acceder con Google
+        </button>
+    </div>
+</div>
 
-<div class="container">
-    <header id="main-header">
-        <div class="company-header-info">
-            <img id="header-logo" class="company-logo-preview" src="" style="display:none;" alt="Logo">
+<!-- PANTALLA PRINCIPAL DEL APLICATIVO -->
+<div id="app-screen">
+    <!-- Controles superiores derecho -->
+    <div class="user-controls">
+        <button class="config-trigger" onclick="toggleModal(true)" title="Configuración de la Empresa">⚙️</button>
+        <button id="btn-logout" class="btn-logout">Cerrar Sesión</button>
+    </div>
+
+    <div class="container">
+        <header id="main-header">
+            <div class="company-header-info">
+                <img id="header-logo" class="company-logo-preview" src="" style="display:none;" alt="Logo">
+                <div>
+                    <h2 id="header-company-name">Cargando Empresa...</h2>
+                    <div id="header-company-details" class="company-details-text"></div>
+                </div>
+            </div>
             <div>
-                <h2 id="header-company-name">Cargando Empresa...</h2>
-                <div id="header-company-details" class="company-details-text"></div>
+                <h1 style="text-align: right;">Presupuesto</h1>
+                <p id="invoice-date" style="font-size: 13px; color: #64748b; text-align: right; margin-top: 5px;"></p>
             </div>
-        </div>
-        <div>
-            <h1 style="text-align: right;">Presupuesto</h1>
-            <p id="invoice-date" style="font-size: 13px; color: #64748b; text-align: right; margin-top: 5px;"></p>
-        </div>
-    </header>
+        </header>
 
-    <!-- Pestañas -->
-    <div class="tabs">
-        <button class="tab-btn active" onclick="openTab('presupuestos')">Crear Presupuesto</button>
-        <button class="tab-btn" onclick="openTab('clientes')">Clientes</button>
-        <button class="tab-btn" onclick="openTab('inventario')">Inventario</button>
-    </div>
-
-    <!-- PRESUPUESTOS -->
-    <div id="presupuestos" class="tab-content active">
-        <h2>Nuevo Presupuesto</h2>
-        
-        <div class="grid-form" style="margin-top: 15px;">
-            <div class="form-group">
-                <label>Buscar Cliente (Nombre o NIT)</label>
-                <input type="text" id="search-client" oninput="searchClientData()" placeholder="Escribe para buscar...">
-                <div id="client-suggestions" class="suggestions-list"></div>
-            </div>
+        <!-- Pestañas -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="openTab('presupuestos')">Crear Presupuesto</button>
+            <button class="tab-btn" onclick="openTab('clientes')">Clientes</button>
+            <button class="tab-btn" onclick="openTab('inventario')">Inventario</button>
         </div>
 
-        <div id="budget-client-preview" style="margin-bottom: 20px; font-size: 14px; background: #f8fafc; padding: 15px; border-radius: 6px; display: none;"></div>
-
-        <div style="border-top: 1px solid var(--border-color); padding-top: 20px;">
-            <h3 class="grid-form">Añadir Artículos</h3>
-            <div class="grid-form" style="margin-top: 10px;">
-                <div class="form-group" style="grid-column: span 2;">
-                    <label>Buscar Artículo (EAN o Nombre)</label>
-                    <input type="text" id="search-item" oninput="searchItemData()" placeholder="Escribe para buscar...">
-                    <div id="item-suggestions" class="suggestions-list"></div>
-                </div>
+        <!-- PRESUPUESTOS -->
+        <div id="presupuestos" class="tab-content active">
+            <h2>Nuevo Presupuesto</h2>
+            
+            <div class="grid-form" style="margin-top: 15px;">
                 <div class="form-group">
-                    <label>Precio Unitario ($)</label>
-                    <input type="number" id="budget-item-price" step="any">
-                </div>
-                <div class="form-group">
-                    <label>Cantidad</label>
-                    <input type="number" id="budget-item-qty" min="1" value="1">
-                </div>
-                <div class="form-group" style="justify-content: flex-end;">
-                    <button type="button" class="btn-primary" onclick="addItemToBudget()">Agregar</button>
+                    <label>Buscar Cliente (Nombre o NIT)</label>
+                    <input type="text" id="search-client" oninput="searchClientData()" placeholder="Escribe para buscar...">
+                    <div id="client-suggestions" class="suggestions-list"></div>
                 </div>
             </div>
 
-            <input type="hidden" id="selected-item-desc">
-            <input type="hidden" id="selected-item-ean">
+            <div id="budget-client-preview" style="margin-bottom: 20px; font-size: 14px; background: #f8fafc; padding: 15px; border-radius: 6px; display: none;"></div>
 
-            <table>
+            <div style="border-top: 1px solid var(--border-color); padding-top: 20px;">
+                <h3 class="grid-form">Añadir Artículos</h3>
+                <div class="grid-form" style="margin-top: 10px;">
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>Buscar Artículo (EAN o Nombre)</label>
+                        <input type="text" id="search-item" oninput="searchItemData()" placeholder="Escribe para buscar...">
+                        <div id="item-suggestions" class="suggestions-list"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Precio Unitario ($)</label>
+                        <input type="number" id="budget-item-price" step="any">
+                    </div>
+                    <div class="form-group">
+                        <label>Cantidad</label>
+                        <input type="number" id="budget-item-qty" min="1" value="1">
+                    </div>
+                    <div class="form-group" style="justify-content: flex-end;">
+                        <button type="button" class="btn-primary" onclick="addItemToBudget()">Agregar</button>
+                    </div>
+                </div>
+
+                <input type="hidden" id="selected-item-desc">
+                <input type="hidden" id="selected-item-ean">
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>EAN</th>
+                            <th>Artículo</th>
+                            <th>Cant.</th>
+                            <th>Precio Unitario</th>
+                            <th>Total</th>
+                            <th class="action-col">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="budget-items-table"></tbody>
+                </table>
+
+                <div class="clearfix">
+                    <div class="totals-box">
+                        <div class="total-row"><span>Subtotal:</span><span id="subtotal">$0.00</span></div>
+                        <div class="total-row"><span>IVA (19%):</span><span id="iva">$0.00</span></div>
+                        <div class="total-row grand-total"><span>Total:</span><span id="total">$0.00</span></div>
+                    </div>
+                </div>
+
+                <div id="company-notes-preview" style="margin-top: 20px; padding: 15px; background: #f1f5f9; border-radius: 6px;">
+                    <strong>Términos y Garantías:</strong>
+                    <p id="preview-garantia" style="white-space: pre-line; margin-top: 5px; font-size: 14px; color: #475569;"></p>
+                </div>
+
+                <div class="grid-form" style="margin-top: 30px;">
+                    <button type="button" class="btn-success" style="font-size: 16px; padding: 15px;" onclick="printBudget()">🖨️ Imprimir / Guardar en PDF</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- CLIENTES -->
+        <div id="clientes" class="tab-content">
+            <h2>Añadir Nuevo Cliente</h2>
+            <form id="client-form" onsubmit="saveClient(event)" style="margin-top: 15px;">
+                <div class="grid-form">
+                    <div class="form-group"><label>NIT / Identificación</label><input type="text" id="cli-nit" required></div>
+                    <div class="form-group"><label>Nombre Completo</label><input type="text" id="cli-nombre" required></div>
+                    <div class="form-group"><label>Dirección</label><input type="text" id="cli-direccion" required></div>
+                    <div class="form-group"><label>Código Postal</label><input type="text" id="cli-postal" required></div>
+                    <div class="form-group"><label>Ciudad</label><input type="text" id="cli-ciudad" required></div>
+                    <div class="form-group"><label>Teléfono</label><input type="tel" id="cli-telefono" required></div>
+                    <div class="form-group"><label>Email</label><input type="email" id="cli-email" required></div>
+                </div>
+                <button type="submit" class="btn-primary">Guardar Cliente</button>
+            </form>
+
+            <h3 style="margin-top: 30px;">Clientes Registrados</h3>
+            <table id="clients-table">
                 <thead>
-                    <tr>
-                        <th>EAN</th>
-                        <th>Artículo</th>
-                        <th>Cant.</th>
-                        <th>Precio Unitario</th>
-                        <th>Total</th>
-                        <th class="action-col">Acción</th>
-                    </tr>
+                    <tr><th>NIT</th><th>Nombre</th><th>Ciudad</th><th>Teléfono</th><th>Email</th></tr>
                 </thead>
-                <tbody id="budget-items-table"></tbody>
+                <tbody></tbody>
             </table>
-
-            <div class="clearfix">
-                <div class="totals-box">
-                    <div class="total-row"><span>Subtotal:</span><span id="subtotal">$0.00</span></div>
-                    <div class="total-row"><span>IVA (19%):</span><span id="iva">$0.00</span></div>
-                    <div class="total-row grand-total"><span>Total:</span><span id="total">$0.00</span></div>
-                </div>
-            </div>
-
-            <div id="company-notes-preview" style="margin-top: 20px; padding: 15px; background: #f1f5f9; border-radius: 6px;">
-                <strong>Términos y Garantías:</strong>
-                <p id="preview-garantia" style="white-space: pre-line; margin-top: 5px; font-size: 14px; color: #475569;"></p>
-            </div>
-
-            <div class="grid-form" style="margin-top: 30px;">
-                <button type="button" class="btn-success" style="font-size: 16px; padding: 15px;" onclick="printBudget()">🖨️ Imprimir / Guardar en PDF</button>
-            </div>
         </div>
-    </div>
 
-    <!-- CLIENTES -->
-    <div id="clientes" class="tab-content">
-        <h2>Añadir Nuevo Cliente</h2>
-        <form id="client-form" onsubmit="saveClient(event)" style="margin-top: 15px;">
-            <div class="grid-form">
-                <div class="form-group"><label>NIT / Identificación</label><input type="text" id="cli-nit" required></div>
-                <div class="form-group"><label>Nombre Completo</label><input type="text" id="cli-nombre" required></div>
-                <div class="form-group"><label>Dirección</label><input type="text" id="cli-direccion" required></div>
-                <div class="form-group"><label>Código Postal</label><input type="text" id="cli-postal" required></div>
-                <div class="form-group"><label>Ciudad</label><input type="text" id="cli-ciudad" required></div>
-                <div class="form-group"><label>Teléfono</label><input type="tel" id="cli-telefono" required></div>
-                <div class="form-group"><label>Email</label><input type="email" id="cli-email" required></div>
-            </div>
-            <button type="submit" class="btn-primary">Guardar Cliente</button>
-        </form>
+        <!-- INVENTARIO -->
+        <div id="inventario" class="tab-content">
+            <h2>Gestión de Inventario</h2>
+            <form id="inventory-form" onsubmit="saveInventoryItem(event)" style="margin-top: 15px;">
+                <div class="grid-form">
+                    <div class="form-group"><label>Código EAN</label><input type="text" id="inv-ean" placeholder="Ej. 7701234567890" required></div>
+                    <div class="form-group" style="grid-column: span 2;"><label>Descripción del Artículo</label><input type="text" id="inv-desc" required></div>
+                    <div class="form-group"><label>Precio de Venta ($)</label><input type="number" id="inv-price" min="0" step="any" required></div>
+                </div>
+                <button type="submit" class="btn-primary">Añadir al Inventario</button>
+            </form>
 
-        <h3 style="margin-top: 30px;">Clientes Registrados</h3>
-        <table id="clients-table">
-            <thead>
-                <tr><th>NIT</th><th>Nombre</th><th>Ciudad</th><th>Teléfono</th><th>Email</th></tr>
-            </thead>
-            <tbody></tbody>
-        </table>
-    </div>
-
-    <!-- INVENTARIO -->
-    <div id="inventario" class="tab-content">
-        <h2>Gestión de Inventario</h2>
-        <form id="inventory-form" onsubmit="saveInventoryItem(event)" style="margin-top: 15px;">
-            <div class="grid-form">
-                <div class="form-group"><label>Código EAN</label><input type="text" id="inv-ean" placeholder="Ej. 7701234567890" required></div>
-                <div class="form-group" style="grid-column: span 2;"><label>Descripción del Artículo</label><input type="text" id="inv-desc" required></div>
-                <div class="form-group"><label>Precio de Venta ($)</label><input type="number" id="inv-price" min="0" step="any" required></div>
-            </div>
-            <button type="submit" class="btn-primary">Añadir al Inventario</button>
-        </form>
-
-        <h3 style="margin-top: 30px;">Artículos en Inventario</h3>
-        <table id="inventory-table">
-            <thead>
-                <tr><th>Código EAN</th><th>Descripción</th><th>Precio</th></tr>
-            </thead>
-            <tbody></tbody>
-        </table>
+            <h3 style="margin-top: 30px;">Artículos en Inventario</h3>
+            <table id="inventory-table">
+                <thead>
+                    <tr><th>Código EAN</th><th>Descripción</th><th>Precio</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -447,21 +548,26 @@
     </div>
 </div>
 
-<!-- SCRIPTS DE FIREBASE (ES Modules) -->
+<!-- SCRIPTS DE FIREBASE CON AUTHENTICATION (ES Modules) -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
+    import { 
+        getAuth, 
+        signInWithPopup, 
+        GoogleAuthProvider, 
+        onAuthStateChanged, 
+        signOut 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { 
         getFirestore, 
         collection, 
-        addDoc, 
         setDoc, 
         doc, 
         getDocs, 
         getDoc 
     } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // Configuración de Firebase
+    // Tu configuración de Firebase
     const firebaseConfig = {
         apiKey: "AIzaSyAckn8zYGignuMZ-aUMI2AAqVISFvDeZpU",
         authDomain: "presupuesto-d6e93.firebaseapp.com",
@@ -472,29 +578,63 @@
         measurementId: "G-Q9C7GBBRS6"
     };
 
-    // Inicializar Firebase
+    // Inicializaciones
     const app = initializeApp(firebaseConfig);
-    const analytics = getAnalytics(app);
+    const auth = getAuth(app);
     const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
 
-    // Listados de datos en Memoria de la App
+    // Arrays en memoria de la app
     window.clients = [];
     window.inventory = [];
     window.companyData = {};
     window.budgetItems = [];
     window.selectedClient = null;
 
-    // Carga inicial de datos desde Firestore
-    window.addEventListener('DOMContentLoaded', async () => {
-        const hoy = new Date();
-        document.getElementById('invoice-date').textContent = "Fecha: " + hoy.toLocaleDateString('es-CO');
-        
-        await loadCompanyData();
-        await loadClients();
-        await loadInventory();
+    const authScreen = document.getElementById('auth-screen');
+    const appScreen = document.getElementById('app-screen');
+
+    // OBSERVADOR DEL ESTADO DE AUTENTICACIÓN
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            // Usuario está logueado
+            authScreen.style.display = 'none';
+            appScreen.style.display = 'block';
+            
+            // Establecer fecha del sistema
+            const hoy = new Date();
+            document.getElementById('invoice-date').textContent = "Fecha: " + hoy.toLocaleDateString('es-CO');
+
+            // Cargar datos desde Firestore
+            await loadCompanyData();
+            await loadClients();
+            await loadInventory();
+        } else {
+            // Usuario no logueado
+            authScreen.style.display = 'flex';
+            appScreen.style.display = 'none';
+        }
     });
 
-    // 1. CARGAR Y APLICAR DATOS DE LA EMPRESA
+    // Eventos de botones Auth
+    document.getElementById('btn-google-login').addEventListener('click', async () => {
+        try {
+            await signInWithPopup(auth, provider);
+        } catch (error) {
+            console.error("Error al autenticar con Google: ", error);
+            alert("No se pudo iniciar sesión. Por favor intenta de nuevo.");
+        }
+    });
+
+    document.getElementById('btn-logout').addEventListener('click', async () => {
+        try {
+            await signOut(auth);
+        } catch (error) {
+            console.error("Error al cerrar sesión: ", error);
+        }
+    });
+
+    // 1. CARGAR CONFIGURACIÓN DE LA EMPRESA
     async function loadCompanyData() {
         try {
             const docRef = doc(db, "configuracion", "empresa");
@@ -506,7 +646,7 @@
                 document.getElementById('header-company-name').textContent = "Configure su Empresa ⚙️";
             }
         } catch (error) {
-            console.error("Error cargando configuración corporativa: ", error);
+            console.error("Error cargando configuración: ", error);
         }
     }
 
@@ -519,7 +659,7 @@
         if(window.companyData.telefono) detailsHtml += `Tel: ${window.companyData.telefono} | ${window.companyData.email || ''}`;
         
         document.getElementById('header-company-details').innerHTML = detailsHtml;
-        document.getElementById('preview-garantia').textContent = window.companyData.notas || 'Sin notas de garantía configuradas.';
+        document.getElementById('preview-garantia').textContent = window.companyData.notes || 'Sin notas de garantía configuradas.';
         
         const img = document.getElementById('header-logo');
         if(window.companyData.logo) {
@@ -576,7 +716,6 @@
 
     // --- ACCIONES DE ESCRITURA EN FIRESTORE ---
 
-    // Guardar Cliente nuevo
     window.saveClient = async function(e) {
         e.preventDefault();
         const client = {
@@ -590,18 +729,15 @@
         };
 
         try {
-            // Guardamos usando el NIT como ID único de documento para evitar duplicaciones
             await setDoc(doc(db, "clientes", client.nit), client);
             document.getElementById('client-form').reset();
             await loadClients();
-            alert('Cliente guardado en Firebase exitosamente.');
+            alert('Cliente guardado exitosamente.');
         } catch (error) {
             console.error("Error agregando cliente: ", error);
-            alert("Hubo un error al sincronizar con la base de datos.");
         }
     }
 
-    // Añadir artículo al inventario
     window.saveInventoryItem = async function(e) {
         e.preventDefault();
         const item = {
@@ -611,17 +747,15 @@
         };
 
         try {
-            // Usamos el código de barras EAN como identificador de documento único
             await setDoc(doc(db, "inventario", item.ean), item);
             document.getElementById('inventory-form').reset();
             await loadInventory();
-            alert('Artículo guardado en inventario de Firebase.');
+            alert('Artículo guardado.');
         } catch (error) {
             console.error("Error al añadir artículo: ", error);
         }
     }
 
-    // Guardar Configuración de la Empresa
     let logoBase64 = "";
     window.processLogo = function(input) {
         const file = input.files[0];
@@ -651,7 +785,7 @@
             window.companyData = updatedCompany;
             applyCompanyData();
             toggleModal(false);
-            alert('Configuración corporativa guardada en la nube.');
+            alert('Configuración corporativa guardada.');
         } catch (error) {
             console.error("Error guardando datos de empresa: ", error);
         }
@@ -659,7 +793,7 @@
 </script>
 
 <script>
-    // Navegación Básica de UI
+    // Flujo normal de UI
     function openTab(tabId) {
         document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -685,7 +819,6 @@
         }
     }
 
-    // Buscadores Interactivos de Presupuesto
     function searchClientData() {
         const query = document.getElementById('search-client').value.toLowerCase();
         const suggestionsBox = document.getElementById('client-suggestions');
@@ -744,7 +877,6 @@
         document.getElementById('item-suggestions').innerHTML = '';
     }
 
-    // Gestión Interna de Artículos del Presupuesto
     function addItemToBudget() {
         let desc = document.getElementById('selected-item-desc').value || document.getElementById('search-item').value;
         let ean = document.getElementById('selected-item-ean').value || "N/A";
@@ -752,7 +884,7 @@
         const qty = parseInt(document.getElementById('budget-item-qty').value);
 
         if(!desc || isNaN(price) || isNaN(qty)) {
-            alert('Ingrese un artículo válido de búsqueda.');
+            alert('Ingrese un artículo válido.');
             return;
         }
 
